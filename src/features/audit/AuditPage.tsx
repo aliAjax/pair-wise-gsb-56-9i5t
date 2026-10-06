@@ -84,7 +84,16 @@ export function AuditPage() {
         destination: item.destination,
         status: item.status,
         round: item.currentRound,
+        personnelScopes: item.personnelScopes,
         rule: workspace.rules.find((rule) => rule.id === item.matchedRuleId)?.name,
+        approvalRoute: item.approvalRoute.map((step) => ({
+          order: step.order,
+          role: step.role,
+          assignee: step.assignee,
+          status: step.status,
+          comment: step.comment,
+          decidedAt: step.decidedAt,
+        })),
         files: workspace.files
           .filter((file) => file.packageId === item.id)
           .map((file) => ({
@@ -94,7 +103,24 @@ export function AuditPage() {
               (version) => version.id === file.referencedVersionId,
             )?.label,
           })),
+        credentials: workspace.credentials
+          .filter((credential) => credential.packageId === item.id)
+          .map((credential) => ({
+            code: credential.code,
+            file: workspace.files.find((file) => file.id === credential.fileId)?.name,
+            version: credential.versionLabel,
+            controlledPages: credential.controlledPages,
+            personnelScopes: credential.personnelScopes,
+            status: credential.status,
+            issueSource: credential.issueSource,
+            issuedAt: credential.issuedAt,
+            expiresAt: credential.expiresAt,
+            endedAt: credential.endedAt,
+            reason: credential.reason,
+          })),
       })),
+      accessRecords: workspace.accessRecords,
+      scopeManualChecks: workspace.scopeManualChecks,
       findings: workspace.findings,
       audit: workspace.audit,
     }

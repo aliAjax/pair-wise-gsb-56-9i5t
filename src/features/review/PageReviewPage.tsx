@@ -11,22 +11,25 @@ import {
   message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { CheckOutlined, SafetyOutlined } from '@ant-design/icons'
+import { CheckOutlined, KeyOutlined, SafetyOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import {
+  useAccessPageMutation,
   useGetWorkspaceQuery,
   useSavePageReviewMutation,
   useValidatePackageMutation,
 } from '@/app/api'
 import type { MaterialCategory, PageReview } from '@/types/domain'
 import { categoryLabels } from '@/services/mockData'
+import { credentialStatusLabels, effectiveStatus } from '@/services/credentials'
 
 export function PageReviewPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { data, isLoading } = useGetWorkspaceQuery()
   const [savePageReview, saveState] = useSavePageReviewMutation()
   const [validatePackage] = useValidatePackageMutation()
+  const [accessPage] = useAccessPageMutation()
   const [selectedPackageId, setSelectedPackageId] = useState(searchParams.get('package') ?? '')
   const [selectedFileId, setSelectedFileId] = useState(searchParams.get('file') ?? '')
   const [selectedRows, setSelectedRows] = useState<React.Key[]>([])
@@ -40,6 +43,37 @@ export function PageReviewPage() {
   const activeVersion = selectedFile?.versions.find(
     (version) => version.id === selectedFile.activeVersionId,
   )
+  const pageCredentialMap = useMemo(() => {
+    const map = new Map<number, { code: string; statusText: string; color: string }>()
+    if (!data || !selectedFile || !activeVersion) return map
+    data.credentials
+      .filter(
+        (item) =>
+          item.fileId === selectedFile.id &&
+          (item.versionId === selectedFile.referencedVersionId ||
+            item.versionId === activeVersion.id),
+      )
+      .forEach((item) => {
+        const status = effectiveStatus(item)
+        item.controlledPages.forEach((page) => {
+          if (!map.has(page) || status === 'active') {
+            map.set(page, {
+              code: item.code,
+              statusText: credentialStatusLabels[status],
+              color:
+                status === 'active'
+                  ? 'success'
+                  : status === 'revoked' || status === 'invalidated'
+                    ? 'error'
+                    : status === 'write-failed' || status === 'manual-check'
+                      ? 'warning'
+                      : 'default',
+            })
+          }
+        })
+      })
+    return map
+  }, [data, selectedFile, activeVersion])
 
   useEffect(() => {
     if (!selectedPackageId && data?.packages[0]) {
@@ -160,6 +194,50 @@ export function PageReviewPage() {
       ),
     },
     {
+      title: '受控页凭证',
+      width: 150,
+      render: (_, record) => {
+        if (!record.controlled) return <span className="muted">一般页不签凭证</span>
+        const badge = pageCredentialMap.get(record.page)
+        return (
+          <Space direction="vertical" size={2}>
+            {badge ? (
+              <>
+                <Tag color={badge.color} icon={<KeyOutlined />}>
+                  {badge.statusText}
+                </Tag>
+                <span className="muted">{badge.code}</span>
+              </>
+            ) : (
+              <Tag>未签发</Tag>
+            )}
+            <Button
+              type="link"
+              size="small"
+              style={{ padding: 0 }}
+              onClick={async () => {
+                try {
+                  const result = await accessPage({
+                    packageId: selectedPackageId,
+                    fileId: selectedFile!.id,
+                    page: record.page,
+                  }).unwrap()
+                  const latest = result.accessRecords[0]
+                  latest?.result === 'granted'
+                    ? message.success(`第 ${record.page} 页凭证校验通过，允许查看`)
+                    : message.error(latest?.deniedReason ?? '访问被拒绝')
+                } catch (error) {
+                  message.error('访问校验失败')
+                }
+              }}
+            >
+              模拟打开本页
+            </Button>
+          </Space>
+        )
+      },
+    },
+    {
       title: '核对说明',
       dataIndex: 'note',
       render: (value: string, record) => (
@@ -266,6 +344,13 @@ export function PageReviewPage() {
         />
       ) : null}
 
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 14 }}
+        message="受控页短期查看凭证与文件引用版本、人员范围绑定：提交审批时签发（30 分钟）；调整受控标记会让该版本凭证立即失效，重新提交后按最新版本签发。"
+      />
+
       <div className="three-column">
         <section className="panel">
           <div className="panel-title">
@@ -314,7 +399,7 @@ export function PageReviewPage() {
             loading={isLoading}
             columns={columns}
             dataSource={pages}
-            scroll={{ x: 1050 }}
+            scroll={{ x: 1230 }}
             pagination={false}
             rowClassName={(record) => (record.reviewedAt ? '' : 'pending-page')}
             rowSelection={{

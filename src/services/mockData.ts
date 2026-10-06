@@ -7,6 +7,7 @@ import type {
   WorkspaceState,
 } from '@/types/domain'
 import { createApprovalRoute, validatePackage } from './rules'
+import { SCHEMA_VERSION, backfillCredentialsForLegacyState } from './credentials'
 
 function pages(
   count: number,
@@ -109,13 +110,19 @@ const rules: LicenseRule[] = [
 ]
 
 const v1 = version('V1.0', 8, true, 'A41C-90D2', '初始工艺规程')
+// 工艺规程 V1.0 第 7 页为受控页（审批批注中已提及固化温度参数）
+v1.pages[6] = { ...v1.pages[6], controlled: true, desensitized: true }
 const v2 = version('V1.1', 9, false, 'D9F2-114A', '新增铺层顺序与固化曲线', {
   controlled: true,
 })
+const moldV1 = version('V1.0', 1, true, 'A41C-90D3', '初始模具装配图')
 const sw1 = version('V2.0', 5, true, '7EA2-319F', '标准控制器软件包')
 const sw2 = version('V2.1', 6, true, '52CC-8D10', '修复通信模块并更新校验文件')
 const us1 = version('V3.2', 12, false, 'E11A-77B4', '光刻设备参数说明', { controlled: true })
 const my1 = version('V1.0', 4, false, '88AB-3411', '厂房布置示意')
+// 旧资料包补登文件：审批引用版本在资料包快照中找不到，回填时人员范围无法确认
+const legacyOld = version('V0.9', 6, true, '33C1-7A08', '历史补充参数页', { controlled: true })
+const legacyNew = version('V1.0', 6, false, '6B20-9D44', '重新核对后的补充参数页')
 
 export function createInitialState(): WorkspaceState {
   const now = '2026-09-28T06:00:00.000Z'
@@ -239,9 +246,18 @@ export function createInitialState(): WorkspaceState {
       packageId: 'pkg-001',
       name: '模具装配图.dwg',
       kind: 'drawing',
-      activeVersionId: v1.id,
-      referencedVersionId: v1.id,
-      versions: [v1],
+      activeVersionId: moldV1.id,
+      referencedVersionId: moldV1.id,
+      versions: [moldV1],
+    },
+    {
+      id: 'file-001-c',
+      packageId: 'pkg-001',
+      name: '固化参数补充页.pdf',
+      kind: 'technical',
+      activeVersionId: legacyNew.id,
+      referencedVersionId: legacyOld.id,
+      versions: [legacyOld, legacyNew],
     },
     {
       id: 'file-002-a',
@@ -293,7 +309,10 @@ export function createInitialState(): WorkspaceState {
         declarations: [...packageItem.declarations],
         activeFileVersions: Object.fromEntries(
           files
-            .filter((file) => file.packageId === packageItem.id)
+            // 补登文件 file-001-c 没有进入过任何资料包快照：其历史引用版本的人员范围无法从快照确认
+            .filter(
+              (file) => file.packageId === packageItem.id && file.id !== 'file-001-c',
+            )
             .map((file) => [file.id, file.activeVersionId]),
         ),
       },
@@ -315,7 +334,9 @@ export function createInitialState(): WorkspaceState {
           declarations: ['最终用户声明'],
           activeFileVersions: {
             'file-001-a': v1.id,
-            'file-001-b': v1.id,
+            'file-001-b': moldV1.id,
+            // 补登文件换版后才被纳入快照，历史引用版本 legacyOld 在任何快照中都不存在
+            'file-001-c': legacyNew.id,
           },
         },
       })
@@ -325,7 +346,8 @@ export function createInitialState(): WorkspaceState {
   const findings = packages.flatMap((packageItem) =>
     validatePackage(packageItem, files, rules),
   )
-  return {
+  // 初始数据模拟升级前的旧版本本地状态：不含凭证集合与访问记录
+  const legacy = {
     packages,
     files,
     rules,
@@ -378,6 +400,11 @@ export function createInitialState(): WorkspaceState {
       },
     ],
   }
+  // 旧数据按审批引用版本回填凭证：范围无法确认的列待人工核对
+  const state = legacy as unknown as WorkspaceState
+  backfillCredentialsForLegacyState(state)
+  state.schemaVersion = SCHEMA_VERSION
+  return state
 }
 
 export const categoryLabels = {
@@ -390,6 +417,7 @@ export const packageStatusLabels: Record<MaterialPackage['status'], string> = {
   draft: '草稿',
   validating: '校验中',
   reviewing: '审批中',
+  recheck: '待复核',
   returned: '已退回',
   approved: '已批准',
   licensed: '已许可',

@@ -181,6 +181,7 @@ export function PackageListPage() {
             { value: 'draft', label: '草稿' },
             { value: 'validating', label: '校验中' },
             { value: 'reviewing', label: '审批中' },
+            { value: 'recheck', label: '待复核' },
             { value: 'returned', label: '已退回' },
             { value: 'approved', label: '已批准' },
             { value: 'licensed', label: '已许可' },

@@ -4,6 +4,7 @@ import {
   DiffOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  KeyOutlined,
   SafetyCertificateOutlined,
   SolutionOutlined,
 } from '@ant-design/icons'
@@ -18,6 +19,7 @@ const menuItems = [
   { key: '/packages', icon: <FileTextOutlined />, label: '资料包' },
   { key: '/page-review', icon: <FileSearchOutlined />, label: '逐页核对' },
   { key: '/approvals', icon: <SolutionOutlined />, label: '审批路线' },
+  { key: '/credentials', icon: <KeyOutlined />, label: '受控页凭证' },
   { key: '/licenses', icon: <SafetyCertificateOutlined />, label: '许可与额度' },
   { key: '/versions', icon: <DiffOutlined />, label: '版本差异' },
   { key: '/audit', icon: <AuditOutlined />, label: '审计与导出' },

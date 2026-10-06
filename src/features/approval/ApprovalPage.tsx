@@ -43,7 +43,13 @@ export function ApprovalPage() {
     [data, selectedId],
   )
   const rule = data?.rules.find((item) => item.id === selected?.matchedRuleId)
-  const activeStep = selected?.approvalRoute.find((step) => step.status === 'active')
+  // 审批中不能随意重新发起；但人员范围、文件版本或受控标记变化退回待复核后，必须重新提交签发凭证
+  const canResubmit = selected
+    ? selected.status === 'recheck' ||
+      selected.status === 'returned' ||
+      selected.status === 'draft' ||
+      !selected.approvalRoute.length
+    : false
 
   if (isLoading || !data) return <div className="panel">正在加载审批路线...</div>
   const workspace = data
@@ -154,7 +160,7 @@ export function ApprovalPage() {
       return
     }
     await submitApproval({ packageId: selected.id }).unwrap()
-    message.success('审批路线已生成或重新发起')
+    message.success('已按最新文件版本和人员范围重新签发受控页凭证，审批路线已重新发起')
   }
 
   async function confirmDecision() {
@@ -180,15 +186,25 @@ export function ApprovalPage() {
           selected ? (
             <Button
               type="primary"
-              disabled={Boolean(activeStep)}
+              disabled={!canResubmit}
               loading={submitState.isLoading}
               onClick={submitCurrent}
             >
-              提交或重新发起审批
+              {selected.status === 'recheck' ? '确认变更并重新提交' : '提交或重新发起审批'}
             </Button>
           ) : null
         }
       />
+
+      {selected?.status === 'recheck' ? (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 14 }}
+          message="审批路线已退回待复核"
+          description="人员范围、文件现行版本或受控标记在审批期间发生变化，原受控页查看凭证已立即失效。请核对差异后重新提交，系统将按当前引用版本和人员范围重新签发短期凭证。"
+        />
+      ) : null}
 
       <section className="panel">
         <div className="panel-title">
@@ -241,8 +257,13 @@ export function ApprovalPage() {
               ) : (
                 <Alert type="info" showIcon message="尚未生成审批路线。" />
               )}
-              <Button onClick={submitCurrent} disabled={Boolean(activeStep)} loading={submitState.isLoading}>
-                重新生成审批路线
+              <Button
+                type={selected.status === 'recheck' ? 'primary' : 'default'}
+                onClick={submitCurrent}
+                disabled={!canResubmit}
+                loading={submitState.isLoading}
+              >
+                {selected.status === 'recheck' ? '确认变更并重新提交审批' : '重新生成审批路线'}
               </Button>
             </Space>
           </section>

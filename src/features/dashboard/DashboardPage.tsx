@@ -15,8 +15,12 @@ export function DashboardPage() {
 
   const highFindings = data.findings.filter((item) => item.level === 'high')
   const activePackages = data.packages.filter((item) =>
-    ['validating', 'reviewing', 'returned'].includes(item.status),
+    ['validating', 'reviewing', 'recheck', 'returned'].includes(item.status),
   )
+  const activeCredentials = data.credentials.filter(
+    (item) => item.status === 'active' && new Date(item.expiresAt).getTime() >= Date.now(),
+  ).length
+  const pendingScopeChecks = data.scopeManualChecks.filter((item) => item.status === 'pending').length
   const controlledPages = data.files.reduce(
     (total, file) =>
       total +
@@ -123,6 +127,11 @@ export function DashboardPage() {
           <span>受控技术页</span>
           <strong>{controlledPages}</strong>
           <small>当前版本已标记受控的页面</small>
+        </div>
+        <div className="metric info">
+          <span>有效查看凭证</span>
+          <strong>{activeCredentials}</strong>
+          <small>30 分钟短期有效{pendingScopeChecks ? `，${pendingScopeChecks} 条范围待人工核对` : ''}</small>
         </div>
         <div className="metric">
           <span>逐页核对进度</span>
