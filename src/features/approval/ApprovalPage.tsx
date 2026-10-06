@@ -12,7 +12,7 @@ import {
   message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusTag } from '@/components/StatusTag'
 import {
@@ -25,6 +25,7 @@ import { approvalLevelLabels } from '@/services/rules'
 
 export function ApprovalPage() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { data, isLoading } = useGetWorkspaceQuery()
   const [submitApproval, submitState] = useSubmitApprovalMutation()
   const [decideApproval, decideState] = useDecideApprovalMutation()
@@ -94,7 +95,9 @@ export function ApprovalPage() {
                 ? 'processing'
                 : value === 'returned'
                   ? 'error'
-                  : 'default'
+                  : value === 'recheck'
+                    ? 'warning'
+                    : 'default'
           }
         >
           {value === 'approved'
@@ -103,7 +106,9 @@ export function ApprovalPage() {
               ? '待审批'
               : value === 'returned'
                 ? '已退回'
-                : '未开始'}
+                : value === 'recheck'
+                  ? '待复核'
+                  : '未开始'}
         </Tag>
       ),
     },
@@ -153,8 +158,14 @@ export function ApprovalPage() {
       message.error('存在高风险核对项，请先修复后提交')
       return
     }
-    await submitApproval({ packageId: selected.id }).unwrap()
-    message.success('审批路线已生成或重新发起')
+    try {
+      await submitApproval({ packageId: selected.id }).unwrap()
+      message.success('审批路线已重新发起，受控页短期查看凭证已签发（一般页不签）')
+    } catch (error) {
+      message.error(
+        (error as { data?: { error?: string } })?.data?.error ?? '提交失败，请检查受控页核对状态',
+      )
+    }
   }
 
   async function confirmDecision() {
@@ -212,6 +223,15 @@ export function ApprovalPage() {
               <h3>{selected.title}</h3>
               <StatusTag status={selected.status} />
             </div>
+            {selected.needsRecheck ? (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginBottom: 14 }}
+                message="审批路线已退回待复核"
+                description={selected.needsRecheck.reason}
+              />
+            ) : null}
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               {selected.approvalRoute.length ? (
                 <Steps
@@ -226,7 +246,9 @@ export function ApprovalPage() {
                           ? '已退回'
                           : step.status === 'active'
                             ? '待处理'
-                            : '等待前序步骤'
+                            : step.status === 'recheck'
+                              ? '待复核（版本/范围变化）'
+                              : '等待前序步骤'
                     }`,
                     status:
                       step.status === 'approved'
@@ -235,7 +257,9 @@ export function ApprovalPage() {
                           ? 'error'
                           : step.status === 'active'
                             ? 'process'
-                            : 'wait',
+                            : step.status === 'recheck'
+                              ? 'wait'
+                              : 'wait',
                   }))}
                 />
               ) : (
@@ -265,6 +289,22 @@ export function ApprovalPage() {
                     (item) => item.packageId === selected.id && item.level === 'high',
                   ).length
                 }
+              </Descriptions.Item>
+              <Descriptions.Item label="有效受控凭证">
+                <Space>
+                  <Tag color="success">
+                    {data.credentials.filter(
+                      (item) => item.packageId === selected.id && item.status === 'active',
+                    ).length}
+                  </Tag>
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={() => navigate(`/credentials?package=${selected.id}`)}
+                  >
+                    管理受控页凭证
+                  </Button>
+                </Space>
               </Descriptions.Item>
             </Descriptions>
           </section>

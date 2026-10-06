@@ -39,6 +39,8 @@ export function DashboardPage() {
       (file.versions.find((version) => version.id === file.activeVersionId)?.pages.length ?? 0),
     0,
   )
+  const activeCredentials = data.credentials.filter((item) => item.status === 'active').length
+  const pendingRecheck = data.packages.filter((item) => item.needsRecheck).length
 
   const findingColumns: TableColumnsType<ValidationFinding> = [
     {
@@ -123,6 +125,14 @@ export function DashboardPage() {
           <span>受控技术页</span>
           <strong>{controlledPages}</strong>
           <small>当前版本已标记受控的页面</small>
+        </div>
+        <div className="metric info">
+          <span>有效受控凭证</span>
+          <strong>{activeCredentials}</strong>
+          <small>
+            30 分钟短期查看凭证
+            {pendingRecheck ? `；${pendingRecheck} 个资料包待复核` : ''}
+          </small>
         </div>
         <div className="metric">
           <span>逐页核对进度</span>

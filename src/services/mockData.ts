@@ -33,6 +33,7 @@ function version(
   hash: string,
   summary: string,
   overrides: Partial<PageReview> = {},
+  pageAdjust?: (page: PageReview, index: number) => PageReview,
 ): FileVersion {
   return {
     id: `version-${crypto.randomUUID()}`,
@@ -40,7 +41,9 @@ function version(
     uploadedAt: '2026-09-27T02:20:00.000Z',
     hash,
     sizeKb: 1280 + pageCount * 96,
-    pages: pages(pageCount, reviewed, overrides),
+    pages: pages(pageCount, reviewed, overrides).map((page, index) =>
+      pageAdjust ? pageAdjust(page, index) : page,
+    ),
     changeSummary: summary,
   }
 }
@@ -113,8 +116,11 @@ const v2 = version('V1.1', 9, false, 'D9F2-114A', '新增铺层顺序与固化�
   controlled: true,
 })
 const sw1 = version('V2.0', 5, true, '7EA2-319F', '标准控制器软件包')
-const sw2 = version('V2.1', 6, true, '52CC-8D10', '修复通信模块并更新校验文件')
-const us1 = version('V3.2', 12, false, 'E11A-77B4', '光刻设备参数说明', { controlled: true })
+const sw2 = version('V2.1', 6, true, '52CC-8D10', '修复通信模块并更新校验文件', {
+  controlled: true,
+  desensitized: true,
+})
+const us1 = version('V3.2', 6, false, 'E11A-77B4', '光刻设备参数说明', { controlled: true })
 const my1 = version('V1.0', 4, false, '88AB-3411', '厂房布置示意')
 
 export function createInitialState(): WorkspaceState {
@@ -377,6 +383,9 @@ export function createInitialState(): WorkspaceState {
         createdAt: '2026-09-27T03:20:00.000Z',
       },
     ],
+    // 旧数据本身不带访问凭证，首次加载时由 storage 迁移按引用版本回填
+    credentials: [],
+    accessRecords: [],
   }
 }
 

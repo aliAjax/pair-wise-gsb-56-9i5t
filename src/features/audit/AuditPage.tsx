@@ -94,8 +94,27 @@ export function AuditPage() {
               (version) => version.id === file.referencedVersionId,
             )?.label,
           })),
+          needsRecheck: item.needsRecheck ?? null,
+          credentials: workspace.credentials
+            .filter((credential) => credential.packageId === item.id)
+            .map((credential) => ({
+              token: credential.token,
+              status: credential.status,
+              source: credential.source,
+              fileId: credential.fileId,
+              versionId: credential.versionId,
+              pageIds: credential.pageIds,
+              personnelScopes: credential.personnelScopes,
+              scopeConfidence: credential.scopeConfidence,
+              issuedAt: credential.issuedAt,
+              expiresAt: credential.expiresAt,
+              invalidReason: credential.invalidReason ?? null,
+              invalidatedAt: credential.invalidatedAt ?? null,
+              renewedFromId: credential.renewedFromId ?? null,
+            })),
       })),
       findings: workspace.findings,
+      accessRecords: workspace.accessRecords,
       audit: workspace.audit,
     }
     await addAudit({

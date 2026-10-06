@@ -48,9 +48,71 @@ export interface ApprovalStep {
   role: string
   assignee: string
   level: ApprovalLevel
-  status: 'waiting' | 'active' | 'approved' | 'returned'
+  status: 'waiting' | 'active' | 'approved' | 'returned' | 'recheck'
   comment: string
   decidedAt?: string
+}
+
+export interface ApprovalReset {
+  reason: string
+  resetAt: string
+  round: number
+  fromStatus: PackageStatus
+}
+
+export type CredentialStatus =
+  | 'active' // 有效：可打开受控页
+  | 'expired' // 短期凭证已到期
+  | 'invalidated' // 版本、受控标记或人员范围变化后失效
+  | 'revoked' // 授权撤回
+  | 'write-failed' // 写入中断，等待恢复重签
+  | 'unconfirmed' // 旧数据回填但范围无法确认，待人工核对
+
+export type CredentialInvalidReason =
+  | 'personnel-scope-changed'
+  | 'file-version-changed'
+  | 'controlled-flag-changed'
+  | 'reference-version-changed'
+  | 'superseded-renewal'
+  | 'authorization-withdrawn'
+  | 'expired'
+  | 'manual-reject'
+
+export type CredentialSource = 'issue' | 'renew' | 'recover' | 'backfill'
+
+export interface ViewCredential {
+  id: string
+  token: string
+  packageId: string
+  fileId: string
+  versionId: string
+  pageIds: string[]
+  personnelScopes: string[]
+  status: CredentialStatus
+  source: CredentialSource
+  scopeConfidence: 'confirmed' | 'unconfirmed'
+  issuedAt: string
+  expiresAt: string
+  invalidReason?: CredentialInvalidReason
+  invalidatedAt?: string
+  renewedFromId?: string
+  renewedById?: string
+  note?: string
+}
+
+export interface AccessRecord {
+  id: string
+  credentialId: string
+  token: string
+  packageId: string
+  fileId: string
+  versionId: string
+  pageId?: string
+  page?: number
+  viewer: string
+  result: 'granted' | 'denied'
+  denyReason?: string
+  at: string
 }
 
 export interface PackageVersion {
@@ -96,6 +158,7 @@ export interface MaterialPackage {
   matchedRuleId?: string
   approvalRoute: ApprovalStep[]
   currentRound: number
+  needsRecheck?: ApprovalReset
   quotaUsed: number
   quotaLimit: number
   createdAt: string
@@ -143,6 +206,9 @@ export interface WorkspaceState {
   findings: ValidationFinding[]
   comments: ReviewComment[]
   audit: AuditEntry[]
+  credentials: ViewCredential[]
+  accessRecords: AccessRecord[]
+  backfilledAt?: string
 }
 
 export interface VersionDiff {
